@@ -1,0 +1,17 @@
+{
+    "dbPath" : "数据文件地址",
+    "passport": {
+        "ak1" : {
+            "serviceName":"名称1",
+            "sk" : "sk1"
+        } ,
+        "ak2" : {
+            "serviceName":"名称2",
+            "sk" : "sk2"
+        }
+    },
+    "otherService": {
+        "Url":"http://baidu.com",
+        "ak":"ak"
+    }
+}

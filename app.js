@@ -12,6 +12,7 @@ const connection = ADODB.open(connectionString);
 app.get('/healthScore', async (req, res) => {
     // 获取对应的参数值
     const { signature, ak, cardnum, nounce } = req.query;
+    // console.log({ signature, ak, cardnum, nounce })
     let sk;
     try {
         sk = config.passport[ak].sk;
@@ -20,12 +21,20 @@ app.get('/healthScore', async (req, res) => {
         res.status(404).send('非目标请求，拒绝此次请求');
         return
     }
+    // console.log(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)
+    // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`))
     // 计算签名是否匹配
     if (signature !== sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)) {
         // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
         res.status(404).send('签名不匹配，拒绝此次请求');
         return
     }
+    // console.log(/\d+/.test(cardnum))
+    if (!/\d{9}$/.test(cardnum)){
+        res.status(404).send('一卡通号内容不正确');
+        return
+    }
+
     let data;
     try {
         data = await connection.query(`SELECT * FROM healthscore WHERE studentNo="${cardnum}"`);
@@ -34,7 +43,10 @@ app.get('/healthScore', async (req, res) => {
         res.status(404).send('查询错误');
         return;
     }
-    const result = {
+    // console.log(data)
+    const result = data === [] ? data :
+    {
+        sex: data[0]['sex'],
         stature: data[0]['stature'],                                          // 身高
         avoirdupois: data[0]['avoirdupois'],                                  // 体重
         vitalCapacity: data[0]['vitalCapacity'],                              // 肺活量
@@ -78,8 +90,13 @@ app.get('/morningExercises', async (req, res) => {
     }
     // 计算签名是否匹配
     if (signature !== sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)) {
-        console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
+        // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
         res.status(404).send('签名不匹配，拒绝此次请求');
+        return
+    }
+    
+    if (!/\d{9}$/.test(cardnum)){
+        res.status(404).send('一卡通号内容不正确');
         return
     }
 
@@ -96,7 +113,7 @@ app.get('/morningExercises', async (req, res) => {
         return;
     }
     
-    console.log(resFromDB);
+    // console.log(resFromDB);
     
     // 获取另外的跑操记录
     let resFromOther
@@ -115,7 +132,8 @@ app.get('/morningExercises', async (req, res) => {
         
     }catch(e){
         console.log(e);
-        res.status(404).send('请求跑操数据出错');
+        console.log('请求跑操数据出错')
+        //res.status(404).send('请求跑操数据出错');
         return;
     }
     console.log(resFromOther);
@@ -141,4 +159,4 @@ app.get('/morningExercises', async (req, res) => {
 
 
 
-app.listen(3000, () => console.log('Example app listening on port 3000!'))
+app.listen(3000, () => console.log('seu-zccx-api listening on port 3000!'))

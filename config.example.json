@@ -12,6 +12,7 @@
     },
     "otherService": {
         "Url":"http://baidu.com",
-        "ak":"ak"
+        "ak":"ak",
+        "sk":"sk"
     }
 }

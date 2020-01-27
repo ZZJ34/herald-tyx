@@ -1,4 +1,4 @@
 /node_modules
-/logs
+/logs/*.log
 config.json
 *.mdb

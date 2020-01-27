@@ -2,12 +2,31 @@ const express = require('express');
 const app = express();
 const ADODB = require('node-adodb');
 const sha = require('sha1');
-const config = require('.\\config.json');
+const config = require('./config.json');
 const axios = require('axios');
 const moment = require('moment');
+const logConfig = require('./log4js.json');
 const connectionString = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=<dbPath>;Persist Security Info=False;Jet OLEDB:Database Password=sport2.0".replace('<dbPath>', config.dbPath);
 const connection = ADODB.open(connectionString);
 
+const log4js = require("log4js");
+
+log4js.configure(logConfig);
+const logConsole = log4js.getLogger('console')
+const logFile = log4js.getLogger('dateLog')
+
+// 添加日志中间件
+app.use((req, res, next)=>{
+    next()
+    if(res.finish === 'fail') {
+        logConsole.error(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' ' + res.reason)
+        logFile.error(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' ' + res.reason)
+    }else{
+        logConsole.info(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' success' )
+        logFile.info(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' success')
+    }
+
+})
 
 app.get('/healthScore', async (req, res) => {
     // 获取对应的参数值
@@ -17,7 +36,9 @@ app.get('/healthScore', async (req, res) => {
     try {
         sk = config.passport[ak].sk;
     } catch (e) {
-        console.log(e);
+        // console.log(e);
+        res.finish = 'fail'
+        res.reason = '非目标请求，拒绝此次请求'
         res.status(404).send('非目标请求，拒绝此次请求');
         return
     }
@@ -26,11 +47,15 @@ app.get('/healthScore', async (req, res) => {
     // 计算签名是否匹配
     if (signature !== sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)) {
         // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
+        res.finish = 'fail'
+        res.reason = '签名不匹配，拒绝此次请求'
         res.status(404).send('签名不匹配，拒绝此次请求');
         return
     }
     // console.log(/\d+/.test(cardnum))
     if (!/\d{9}$/.test(cardnum)){
+        res.finish = 'fail'
+        res.reason = '一卡通号内容不正确'
         res.status(404).send('一卡通号内容不正确');
         return
     }
@@ -39,7 +64,9 @@ app.get('/healthScore', async (req, res) => {
     try {
         data = await connection.query(`SELECT * FROM healthscore WHERE studentNo="${cardnum}"`);
     } catch (e) {
-        console.log(e);
+        // console.log(e);
+        res.finish = 'fail'
+        res.reason = '查询错误'
         res.status(404).send('查询错误');
         return;
     }
@@ -73,7 +100,6 @@ app.get('/healthScore', async (req, res) => {
         score: data[0]['score'],                                              // 总分
 
     }
-
     res.send(result);
 });
 
@@ -84,18 +110,24 @@ app.get('/morningExercises', async (req, res) => {
     try {
         sk = config.passport[ak].sk;
     } catch (e) {
-        console.log(e);
+        // console.log(e);
+        res.finish = 'fail'
+        res.reason = '非目标请求，拒绝此次请求'
         res.status(404).send('非目标请求，拒绝此次请求');
         return
     }
     // 计算签名是否匹配
     if (signature !== sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)) {
         // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
+        res.finish = 'fail'
+        res.reason = '签名不匹配，拒绝此次请求'
         res.status(404).send('签名不匹配，拒绝此次请求');
         return
     }
     
     if (!/\d{9}$/.test(cardnum)){
+        res.finish = 'fail'
+        res.reason = '一卡通号内容不正确'
         res.status(404).send('一卡通号内容不正确');
         return
     }
@@ -108,7 +140,8 @@ app.get('/morningExercises', async (req, res) => {
             resFromDB.push(time['date'].slice(0,10));
         });
     }catch(e){
-        console.log(e);
+        res.finish = 'fail'
+        res.reason = '查询错误'
         res.status(404).send('查询错误');
         return;
     }
@@ -131,12 +164,15 @@ app.get('/morningExercises', async (req, res) => {
         resFromOther.records = resFromOther.records.map(time => moment(time).format('YYYY-MM-DD'));
         
     }catch(e){
-        console.log(e);
-        console.log('请求跑操数据出错')
-        //res.status(404).send('请求跑操数据出错');
-        return;
+        //console.log(e);
+        //console.log('请求跑操数据出错')
+        //return;
+        res.finish = 'fail'
+        res.reason = '请求跑操数据出错'
+        res.status(404).send('请求跑操数据出错');
+        return 
     }
-    console.log(resFromOther);
+    // console.log(resFromOther);
 
     let trueRecords = {}
     resFromOther.records.forEach(time => {
@@ -159,4 +195,5 @@ app.get('/morningExercises', async (req, res) => {
 
 
 
-app.listen(3000, () => console.log('seu-zccx-api listening on port 3000!'))
+
+app.listen(3001, () => console.log('seu-zccx-api listening on port 3001!'))

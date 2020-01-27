@@ -1,0 +1,20 @@
+{
+    "appenders": {
+      "dateLog": {
+        "type": "dateFile",
+        "filename": "./logs/date",
+        "pattern": "yyyy-MM-dd.log",
+        "alwaysIncludePattern": true,
+        "category": "dateLog"
+      },
+      "console": {
+        "type": "console",
+        "category": "console"
+      }
+      
+    },
+    "categories": {
+        "default": { "appenders": [ "console"], "level": "ALL" },
+        "dateLog": { "appenders": [ "dateLog"], "level": "ALL" }
+    }
+  }

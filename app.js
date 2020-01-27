@@ -18,12 +18,18 @@ const logFile = log4js.getLogger('dateLog')
 // 添加日志中间件
 app.use((req, res, next)=>{
     next()
+    let serviceName 
+    try{
+        serviceName = config.passport[req.query.ak].serviceName
+    }catch(e){
+        serviceName = 'unknow'
+    }
     if(res.finish === 'fail') {
-        logConsole.error(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' ' + res.reason)
-        logFile.error(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' ' + res.reason)
+        logConsole.error(req.path + ' from '+ serviceName + ' ' + res.reason)
+        logFile.error(req.path + ' from '+ serviceName + ' ' + res.reason)
     }else{
-        logConsole.info(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' success' )
-        logFile.info(req.path + ' by ' + req.hostname + ' from '+ req.ip + ' success')
+        logConsole.info(req.path +  ' from '+ serviceName + ' success' )
+        logFile.info(req.path + ' from '+  serviceName + ' success')
     }
 
 })

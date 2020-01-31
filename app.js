@@ -15,25 +15,6 @@ log4js.configure(logConfig);
 const logConsole = log4js.getLogger('console')
 const logFile = log4js.getLogger('dateLog')
 
-// 添加日志中间件
-app.use((req, res, next)=>{
-    next()
-    let serviceName 
-    try{
-        serviceName = config.passport[req.query.ak].serviceName
-    }catch(e){
-        serviceName = 'unknow'
-    }
-    if(res.finish === 'fail') {
-        logConsole.error(req.path + ' from '+ serviceName + ' ' + res.reason)
-        logFile.error(req.path + ' from '+ serviceName + ' ' + res.reason)
-    }else{
-        logConsole.info(req.path +  ' from '+ serviceName + ' success' )
-        logFile.info(req.path + ' from '+  serviceName + ' success')
-    }
-
-})
-
 app.get('/healthScore', async (req, res) => {
     // 获取对应的参数值
     const { signature, ak, cardnum, nounce } = req.query;
@@ -43,37 +24,28 @@ app.get('/healthScore', async (req, res) => {
         sk = config.passport[ak].sk;
     } catch (e) {
         // console.log(e);
-        res.finish = 'fail'
-        res.reason = '非目标请求，拒绝此次请求'
-        res.status(404).send('非目标请求，拒绝此次请求');
-        return
+        next('非目标请求，拒绝此次请求')
+        return;
     }
     // console.log(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)
     // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`))
     // 计算签名是否匹配
     if (signature !== sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)) {
         // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
-        res.finish = 'fail'
-        res.reason = '签名不匹配，拒绝此次请求'
-        res.status(404).send('签名不匹配，拒绝此次请求');
-        return
+        next('签名不匹配，拒绝此次请求')
+        return;
     }
     // console.log(/\d+/.test(cardnum))
     if (!/\d{9}$/.test(cardnum)){
-        res.finish = 'fail'
-        res.reason = '一卡通号内容不正确'
-        res.status(404).send('一卡通号内容不正确');
-        return
+        next('一卡通号内容不正确')
+        return;
     }
 
     let data;
     try {
         data = await connection.query(`SELECT * FROM healthscore WHERE studentNo="${cardnum}"`);
     } catch (e) {
-        // console.log(e);
-        res.finish = 'fail'
-        res.reason = '查询错误'
-        res.status(404).send('查询错误');
+        next('查询错误')
         return;
     }
     // console.log(data)
@@ -106,10 +78,19 @@ app.get('/healthScore', async (req, res) => {
         score: data[0]['score'],                                              // 总分
 
     }
+
+    try{
+        serviceName = config.passport[req.query.ak].serviceName
+    }catch(e){
+        serviceName = 'unknow'
+    }
+    logConsole.info(req.path +  ' from '+ serviceName + ` success ${cardnum}` )
+    logFile.info(req.path + ' from '+  serviceName + ` success ${cardnum}`)
+
     res.send(result);
 });
 
-app.get('/morningExercises', async (req, res) => {
+app.get('/morningExercises', async function(req, res, next) {
     // 获取对应的参数值
     const { signature, ak, cardnum, nounce } = req.query;
     let sk;
@@ -117,43 +98,31 @@ app.get('/morningExercises', async (req, res) => {
         sk = config.passport[ak].sk;
     } catch (e) {
         // console.log(e);
-        res.finish = 'fail'
-        res.reason = '非目标请求，拒绝此次请求'
-        res.status(404).send('非目标请求，拒绝此次请求');
-        return
+        next('非目标请求，拒绝此次请求')
+        return;
     }
     // 计算签名是否匹配
     if (signature !== sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`)) {
         // console.log(sha(`ak=${ak}&cardnum=${cardnum}&nounce=${nounce}&sk=${sk}`));
-        res.finish = 'fail'
-        res.reason = '签名不匹配，拒绝此次请求'
-        res.status(404).send('签名不匹配，拒绝此次请求');
-        return
+        next('签名不匹配，拒绝此次请求')
+        return;
     }
-    
     if (!/\d{9}$/.test(cardnum)){
-        res.finish = 'fail'
-        res.reason = '一卡通号内容不正确'
-        res.status(404).send('一卡通号内容不正确');
+        next('一卡通号内容不正确')
         return
     }
-
     // 获取本地数据库的数据
     let resFromDB = []
     try{    
         let data = await connection.query(`SELECT date FROM [CHECK] WHERE studentNo="${cardnum}"`);
         data.forEach(time => {
-            resFromDB.push(time['date'].slice(0,10));
+            resFromDB.push(+moment(time['date']));
         });
     }catch(e){
-        res.finish = 'fail'
-        res.reason = '查询错误'
-        res.status(404).send('查询错误');
+        next('查询错误')
         return;
     }
-    
     // console.log(resFromDB);
-    
     // 获取另外的跑操记录
     let resFromOther
     try {
@@ -164,21 +133,17 @@ app.get('/morningExercises', async (req, res) => {
                 cardnum,                
                 nounce: 'tyx',
                 ak: config['otherService']['ak']
-            }
+            },
+            timeout: 1000
         })
+        // console.log(resFromOther.data)
         resFromOther = resFromOther.data;
-        resFromOther.records = resFromOther.records.map(time => moment(time).format('YYYY-MM-DD'));
+        resFromOther.records = resFromOther.records.map(time => +moment(time));
         
-    }catch(e){
-        //console.log(e);
-        //console.log('请求跑操数据出错')
-        //return;
-        res.finish = 'fail'
-        res.reason = '请求跑操数据出错'
-        res.status(404).send('请求跑操数据出错');
+    }catch(err){
+        next('请求跑操数据出错')
         return 
     }
-    // console.log(resFromOther);
 
     let trueRecords = {}
     resFromOther.records.forEach(time => {
@@ -192,14 +157,34 @@ app.get('/morningExercises', async (req, res) => {
         }
     })
 
+    try{
+        serviceName = config.passport[req.query.ak].serviceName
+    }catch(e){
+        serviceName = 'unknow'
+    }
+    logConsole.info(req.path +  ' from '+ serviceName + ` success ${cardnum}` )
+    logFile.info(req.path + ' from '+  serviceName + ` success ${cardnum}`)
+
+
     res.send({
         cardnum,
         records:Object.keys(trueRecords)
     });
+
     
 });
 
-
+app.use(function (err, req, res, next) {
+    let serviceName 
+    try{
+        serviceName = config.passport[req.query.ak].serviceName
+    }catch(e){
+        serviceName = 'unknow'
+    }
+    logConsole.error(req.path + ' from ' + serviceName + ' ' + err)
+    logFile.error(req.path + ' from ' + serviceName + ' ' + err)
+    res.status(404).send(err)
+})
 
 
 app.listen(3001, () => console.log('seu-zccx-api listening on port 3001!'))
